@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Broadcast Browser OSC Reference</title><style>
+:root { color-scheme: light dark; --bg:#ffffff; --fg:#1d1d1f; --muted:#6e6e73; --line:#d2d2d7; --code:#f2f2f5; --accent:#d62a36; }
+@media (prefers-color-scheme: dark) { :root { --bg:#1c1c1e; --fg:#f2f2f7; --muted:#a1a1a6; --line:#3a3a3c; --code:#2c2c2e; --accent:#ff5a63; } }
+body { background:var(--bg); color:var(--fg); font:15px/1.55 -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif; margin:0; }
+main { max-width: 980px; margin: 0 auto; padding: 32px 24px 80px; }
+h1 { font-size: 30px; margin: 0 0 12px; } h2 { font-size: 22px; margin-top: 40px; border-bottom: 1px solid var(--line); padding-bottom: 6px; }
+h3 { font-size: 18px; margin-top: 28px; } h4 { font-size: 15px; margin-top: 22px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+code { font: 13px/1.4 ui-monospace, "SF Mono", Menlo, monospace; background: var(--code); padding: 1px 5px; border-radius: 4px; }
+pre { background: var(--code); padding: 14px 16px; border-radius: 8px; overflow-x: auto; }
+pre code { background: none; padding: 0; }
+table { border-collapse: collapse; width: 100%; margin: 12px 0 20px; font-size: 14px; display: block; overflow-x: auto; }
+th, td { border-bottom: 1px solid var(--line); padding: 7px 10px; text-align: left; vertical-align: top; }
+th { color: var(--muted); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; }
+td code { white-space: nowrap; }
+a { color: var(--accent); }
+hr { border: 0; border-top: 1px solid var(--line); margin: 32px 0; }
+</style></head>
+<body><main>
+<h1 id="broadcast-browser-osc-reference">Broadcast Browser OSC Reference</h1>
+<p>Broadcast Browser can be controlled with <strong>OSC (Open Sound Control)</strong>, and it reports its status as OSC. With this you can start and stop a broadcast from a Stream Deck (through Bitfocus Companion), QLab, TouchOSC, a lighting desk, or your own scripts, and you can check from anywhere that every tab and output is healthy.</p>
+<ul><li><strong>Input (commands):</strong> UDP port <strong>9300</strong> by default. Set it in</li></ul>
+<p><em>Preferences › OSC › Input port</em>.</p>
+<ul><li><strong>Output (feedback):</strong> sent to <strong>127.0.0.1:9301</strong> by default. Set it in</li></ul>
+<p><em>Preferences › OSC › Feedback output</em>.</p>
+<p>Every address starts with **<code>/bb/</code>**.</p>
+<hr>
+<h2 id="1-transport">1. Transport</h2>
+<table><thead><tr><th></th><th></th></tr></thead><tbody><tr><td>Protocol</td><td>OSC 1.0 over <strong>UDP</strong>, IPv4</td></tr><tr><td>Input port</td><td><code>9300</code> by default; any free port from 1024 to 65535</td></tr><tr><td>Feedback destination</td><td><code>127.0.0.1:9301</code> by default; any host name or IPv4 address, including broadcast addresses</td></tr><tr><td>Feedback rate</td><td>a full status snapshot every 1 s by default (250 ms – 5 s), plus immediate events when something changes</td></tr><tr><td>Packets</td><td>one message per UDP packet by default. Optional: OSC bundles of up to 1400 bytes each, time tag <code>1</code> (&quot;immediately&quot;)</td></tr><tr><td>Encoding</td><td>big-endian, 4-byte aligned, as defined by the OSC 1.0 specification</td></tr></tbody></table>
+<p><strong>Port check.</strong> When you apply a new input port, the app first tries to bind it. If another application already owns the port, the app says so and does <strong>not</strong> switch, so pick a different port. If the saved port is taken at launch, the status bar shows <strong>OSC off</strong> and Preferences explains why.</p>
+<p><strong>Security.</strong> OSC has no authentication. On a shared network, fill in <em>Accept from</em>: a comma-separated list of IP addresses that may send commands (<code>localhost</code> is accepted for <code>127.0.0.1</code>). Packets from any other address are counted as <em>Rejected</em> and ignored. The <code>/js</code> and <code>/css</code> commands are disabled unless you turn on <em>Allow /js and /css commands</em>.</p>
+<hr>
+<h2 id="2-data-types">2. Data types</h2>
+<table><thead><tr><th>Tag</th><th>Type</th><th>Notes</th></tr></thead><tbody><tr><td><code>i</code></td><td>32-bit signed integer</td><td>big-endian</td></tr><tr><td><code>f</code></td><td>32-bit IEEE float</td><td>big-endian</td></tr><tr><td><code>s</code></td><td>string</td><td>UTF-8, null-terminated, padded with nulls to a multiple of 4 bytes</td></tr><tr><td><code>T</code> / <code>F</code></td><td>true / false</td><td>type tag only, no data bytes</td></tr><tr><td><code>h</code></td><td>64-bit integer</td><td>accepted on input</td></tr><tr><td><code>d</code></td><td>64-bit double</td><td>accepted on input</td></tr><tr><td><code>N</code>, <code>I</code></td><td>nil, impulse</td><td>accepted on input (<code>I</code> counts as &quot;true&quot;)</td></tr></tbody></table>
+<h3 id="true-false-values-in-feedback">True/false values in feedback</h3>
+<p>Pick the style in <em>Preferences › OSC › True/false values</em>:</p>
+<table><thead><tr><th>Setting</th><th><code>isLive = true</code> is sent as</th><th><code>isLive = false</code> is sent as</th></tr></thead><tbody><tr><td>OSC true/false (default)</td><td>type tag <code>T</code></td><td>type tag <code>F</code></td></tr><tr><td>Integer 1/0</td><td><code>i 1</code></td><td><code>i 0</code></td></tr><tr><td>String</td><td><code>s &quot;true&quot;</code></td><td><code>s &quot;false&quot;</code></td></tr></tbody></table>
+<p>Some receivers ignore OSC <code>T</code>/<code>F</code> arguments. If yours shows no value for <code>isLive</code>, choose <strong>Integer 1/0</strong>.</p>
+<h3 id="true-false-values-in-commands">True/false values in commands</h3>
+<p>Any argument that means true/false accepts:</p>
+<ul><li><code>T</code>, <code>F</code></li><li>integers or floats (<code>0</code> = false, anything else = true)</li><li>the strings <code>true</code>, <code>false</code>, <code>on</code>, <code>off</code>, <code>yes</code>, <code>no</code>, <code>1</code>, <code>0</code></li></ul>
+<hr>
+<h2 id="3-addressing-tabs-and-outputs">3. Addressing tabs and outputs</h2>
+<p>Wherever this reference writes **<code>{tab}</code>**, you can use any of these:</p>
+<table><thead><tr><th>Form</th><th>Example</th><th>Meaning</th></tr></thead><tbody><tr><td>Position</td><td><code>/bb/tab/2/goLive</code></td><td>The 2nd tab from the left (1-based)</td></tr><tr><td><code>selected</code></td><td><code>/bb/tab/selected/reload</code></td><td>The tab currently shown in the main window</td></tr><tr><td>Tab ID</td><td><code>/bb/tab/7F2C…-E91A/stop</code></td><td>The tab&#x27;s UUID, which never changes. Read it from <code>/bb/tab/{n}/id</code></td></tr><tr><td>Tab name</td><td><code>/bb/tab/Scoreboard/goLive</code></td><td>The tab name (from <em>Page › Name</em>, or the page title). Not case-sensitive; write spaces as <code>_</code>, e.g. <code>Main_Scoreboard</code></td></tr></tbody></table>
+<p>Wherever this reference writes **<code>{output}</code>**, you can use:</p>
+<ul><li>a position: the 1-based order in that tab&#x27;s Outputs panel</li><li>the output&#x27;s UUID</li><li>the output&#x27;s name, with spaces written as <code>_</code></li></ul>
+<p>Positions change when you reorder, add or close tabs. The app sends <code>/bb/event/tabsChanged</code> whenever that happens. For permanent mappings, use tab names or IDs.</p>
+<hr>
+<h2 id="4-commands-send-these-to-the-input-port">4. Commands (send these to the input port)</h2>
+<p>Most commands return nothing. A command that fails returns <code>/bb/error s:message</code>, sent to the sender <strong>and</strong> to the feedback destination.</p>
+<h3 id="general">General</h3>
+<table><thead><tr><th>Address</th><th>Arguments</th><th>What it does</th></tr></thead><tbody><tr><td><code>/bb/ping</code></td><td>none</td><td>Replies <code>/bb/pong s:version</code> to the sender and the feedback destination</td></tr><tr><td><code>/bb/feedback/refresh</code></td><td>none</td><td>Sends a full status snapshot right away</td></tr><tr><td><code>/bb/feedback/subscribe</code></td><td><code>[i:port]</code></td><td>Adds the sender&#x27;s IP as an extra feedback destination, on <code>port</code> or, if no port is given, the port the command came from. Up to 16 subscribers; they last until the app quits</td></tr><tr><td><code>/bb/feedback/unsubscribe</code></td><td><code>[i:port]</code></td><td>Removes that subscription</td></tr></tbody></table>
+<h3 id="session-all-tabs">Session (all tabs)</h3>
+<table><thead><tr><th>Address</th><th>Arguments</th><th>What it does</th></tr></thead><tbody><tr><td><code>/bb/session/goLive</code></td><td>none</td><td>Starts every output marked <em>Start with Go Live</em> on every tab. Alias: <code>/bb/session/start</code></td></tr><tr><td><code>/bb/session/stop</code></td><td>none</td><td>Stops every output on every tab</td></tr><tr><td><code>/bb/session/live</code></td><td><code>bool</code></td><td>true = go live, false = stop</td></tr><tr><td><code>/bb/session/toggle</code></td><td>none</td><td>Stops if anything is on air, otherwise goes live</td></tr><tr><td><code>/bb/session/save</code></td><td>none</td><td>Saves the session to its existing file. If it has never been saved, replies with an error</td></tr></tbody></table>
+<h3 id="tabs">Tabs</h3>
+<table><thead><tr><th>Address</th><th>Arguments</th><th>What it does</th></tr></thead><tbody><tr><td><code>/bb/tab/new</code></td><td><code>[s:url]</code></td><td>Opens a new tab in the background. Replies <code>/bb/event/tabCreated i:position s:id</code></td></tr><tr><td><code>/bb/tab/{tab}/goLive</code></td><td>none</td><td>Starts that tab&#x27;s <em>Start with Go Live</em> outputs. Alias: <code>start</code>. Leaves Edit Mode first</td></tr><tr><td><code>/bb/tab/{tab}/stop</code></td><td>none</td><td>Stops all of the tab&#x27;s outputs</td></tr><tr><td><code>/bb/tab/{tab}/live</code></td><td><code>bool</code></td><td>true = go live, false = stop</td></tr><tr><td><code>/bb/tab/{tab}/toggle</code></td><td>none</td><td>Toggles the tab&#x27;s live state</td></tr><tr><td><code>/bb/tab/{tab}/reload</code></td><td>none</td><td>Reloads the page</td></tr><tr><td><code>/bb/tab/{tab}/url</code></td><td><code>s:url</code></td><td>Loads an address or search text, exactly as if typed in the address bar</td></tr><tr><td><code>/bb/tab/{tab}/zoom</code></td><td><code>f:zoom</code></td><td>Sets the page zoom. <code>1.0</code> = 100%, range 0.25–5. Values above 10 are read as percent, so <code>150</code> means 150%</td></tr><tr><td><code>/bb/tab/{tab}/zoomIn</code>, <code>/zoomOut</code>, <code>/zoomReset</code></td><td>none</td><td>Steps the zoom like ⌘+ / ⌘− / ⌘0</td></tr><tr><td><code>/bb/tab/{tab}/select</code></td><td>none</td><td>Shows the tab in the main window. Doesn&#x27;t affect outputs</td></tr><tr><td><code>/bb/tab/{tab}/mute</code></td><td><code>bool</code></td><td>Mutes or unmutes the tab&#x27;s audio</td></tr><tr><td><code>/bb/tab/{tab}/edit</code></td><td><code>bool</code></td><td>Enters or leaves Edit Mode. Leaving releases held outputs</td></tr><tr><td><code>/bb/tab/{tab}/isolate</code></td><td><code>s:selector</code></td><td>Shows only the elements matching that CSS selector. <code>&quot;&quot;</code> shows the whole page again</td></tr><tr><td><code>/bb/tab/{tab}/scroll</code></td><td><code>f:x f:y</code></td><td>Scrolls the page to x, y (CSS pixels)</td></tr><tr><td><code>/bb/tab/{tab}/scrollBy</code></td><td><code>f:dx f:dy</code></td><td>Scrolls by dx, dy (CSS pixels)</td></tr><tr><td><code>/bb/tab/{tab}/rule/{n}/enabled</code></td><td><code>bool</code></td><td>Turns saved style change <em>n</em> on or off. <em>n</em> is its 1-based position in Customize › Saved changes. Useful for showing and hiding elements on cue</td></tr><tr><td><code>/bb/tab/{tab}/js</code></td><td><code>s:code</code></td><td>Runs JavaScript in the page and replies <code>/bb/tab/{tab}/jsResult s:result</code>. **Requires *Allow /js and /css commands***</td></tr><tr><td><code>/bb/tab/{tab}/css</code></td><td><code>s:css</code></td><td>Replaces the tab&#x27;s Custom CSS, which is saved with the session. **Requires *Allow /js and /css commands***</td></tr><tr><td><code>/bb/tab/{tab}/close</code></td><td>none</td><td>Closes the tab without asking, which stops its outputs</td></tr></tbody></table>
+<h3 id="outputs">Outputs</h3>
+<table><thead><tr><th>Address</th><th>Arguments</th><th>What it does</th></tr></thead><tbody><tr><td><code>/bb/tab/{tab}/output/{output}/start</code></td><td>none</td><td>Starts one output</td></tr><tr><td><code>/bb/tab/{tab}/output/{output}/stop</code></td><td>none</td><td>Stops one output</td></tr><tr><td><code>/bb/tab/{tab}/output/{output}/toggle</code></td><td>none</td><td>Toggles one output</td></tr><tr><td><code>/bb/tab/{tab}/output/{output}/live</code></td><td><code>bool</code></td><td>true = start, false = stop</td></tr></tbody></table>
+<p>Command words are not case-sensitive: <code>/bb/tab/1/golive</code> works the same as <code>/bb/tab/1/goLive</code>.</p>
+<hr>
+<h2 id="5-feedback-sent-to-the-feedback-destination">5. Feedback (sent to the feedback destination)</h2>
+<h3 id="5-1-status-snapshot">5.1 Status snapshot</h3>
+<p>The app sends the whole snapshot every interval, as individual messages or packed into bundles. Below, <code>{n}</code> is a tab&#x27;s 1-based position and <code>{m}</code> is an output&#x27;s 1-based position within that tab. <code>bool</code> means the true/false style you chose (see section 2).</p>
+<h4 id="app-and-system">App and system</h4>
+<table><thead><tr><th>Address</th><th>Type</th><th>Meaning</th></tr></thead><tbody><tr><td><code>/bb/heartbeat</code></td><td><code>i</code></td><td>Counts up by 1 with every snapshot. If it stops changing, the app is not running or not reachable</td></tr><tr><td><code>/bb/app/version</code></td><td><code>s</code></td><td>App version</td></tr><tr><td><code>/bb/stats/cpuApp</code></td><td><code>f</code></td><td>CPU used by Broadcast Browser and its WebKit processes, in % of <strong>one core</strong> (can go above 100)</td></tr><tr><td><code>/bb/stats/cpuAppOfMac</code></td><td><code>f</code></td><td>The same CPU usage, in % of the <strong>whole Mac</strong> (0–100)</td></tr><tr><td><code>/bb/stats/cpuSystem</code></td><td><code>f</code></td><td>Total CPU in use on the Mac, in % (0–100)</td></tr><tr><td><code>/bb/stats/gpu</code></td><td><code>f</code></td><td>GPU utilization in %</td></tr><tr><td><code>/bb/stats/memoryAppMB</code></td><td><code>f</code></td><td>Memory used by the app and its WebKit processes, in MB</td></tr><tr><td><code>/bb/stats/memorySystemUsedGB</code></td><td><code>f</code></td><td>Memory in use on the Mac, in GB (the same measure as Activity Monitor)</td></tr><tr><td><code>/bb/stats/memorySystemTotalGB</code></td><td><code>f</code></td><td>Installed memory, in GB</td></tr><tr><td><code>/bb/stats/networkOutMbps</code></td><td><code>f</code></td><td>Network send rate, all interfaces, in Mbps. NDI traffic shows up here</td></tr><tr><td><code>/bb/stats/networkInMbps</code></td><td><code>f</code></td><td>Network receive rate, in Mbps</td></tr><tr><td><code>/bb/stats/thermal</code></td><td><code>s</code></td><td><code>nominal</code>, <code>fair</code>, <code>serious</code> or <code>critical</code></td></tr><tr><td><code>/bb/stats/thermalLevel</code></td><td><code>i</code></td><td>0 = nominal, 1 = fair, 2 = serious, 3 = critical</td></tr><tr><td><code>/bb/audio/active</code></td><td><code>bool</code></td><td>Audio capture is running, because at least one output has audio turned on</td></tr><tr><td><code>/bb/audio/source</code></td><td><code>s</code></td><td><code>website</code> or <code>testTone</code></td></tr><tr><td><code>/bb/audio/peakL</code>, <code>/bb/audio/peakR</code></td><td><code>f</code></td><td>Peak level in dBFS. −90 means silence; 0 is full scale</td></tr></tbody></table>
+<p>The CPU, GPU, memory and network values are missing from the very first snapshot after launch, because they need one second of measurement.</p>
+<h4 id="session">Session</h4>
+<table><thead><tr><th>Address</th><th>Type</th><th>Meaning</th></tr></thead><tbody><tr><td><code>/bb/session/open</code></td><td><code>bool</code></td><td>A session is open. False while the start page is showing, in which case nothing below is sent</td></tr><tr><td><code>/bb/session/name</code></td><td><code>s</code></td><td>Session name</td></tr><tr><td><code>/bb/session/isLive</code></td><td><code>bool</code></td><td>At least one output on any tab is on air</td></tr><tr><td><code>/bb/session/uptime</code></td><td><code>f</code></td><td>Seconds the session has been continuously on air. 0 when off air</td></tr><tr><td><code>/bb/session/uptimeText</code></td><td><code>s</code></td><td>The same, as <code>HH:MM:SS</code></td></tr><tr><td><code>/bb/session/tabCount</code></td><td><code>i</code></td><td>Number of tabs</td></tr><tr><td><code>/bb/session/outputsLive</code></td><td><code>i</code></td><td>Outputs currently running, across all tabs</td></tr><tr><td><code>/bb/session/outputsTotal</code></td><td><code>i</code></td><td>All configured outputs</td></tr><tr><td><code>/bb/session/outputsError</code></td><td><code>i</code></td><td>Outputs that are in an error state</td></tr><tr><td><code>/bb/session/tabNames</code></td><td><code>s s s …</code></td><td>One string per tab, in tab order</td></tr><tr><td><code>/bb/session/tabsLive</code></td><td><code>bool bool …</code></td><td>One value per tab, in tab order</td></tr></tbody></table>
+<h4 id="tabs-bb-tab-n">Tabs: <code>/bb/tab/{n}/…</code></h4>
+<table><thead><tr><th>Address</th><th>Type</th><th>Meaning</th></tr></thead><tbody><tr><td><code>…/id</code></td><td><code>s</code></td><td>Tab UUID, which stays the same across sessions</td></tr><tr><td><code>…/name</code></td><td><code>s</code></td><td>Tab name (the custom name, or the page title)</td></tr><tr><td><code>…/url</code></td><td><code>s</code></td><td>Current address</td></tr><tr><td><code>…/isLive</code></td><td><code>bool</code></td><td><strong>At least one of this tab&#x27;s outputs is on air</strong></td></tr><tr><td><code>…/uptime</code></td><td><code>f</code></td><td>Seconds this tab has been on air (0 when off)</td></tr><tr><td><code>…/uptimeText</code></td><td><code>s</code></td><td>The same, as <code>HH:MM:SS</code></td></tr><tr><td><code>…/isSelected</code></td><td><code>bool</code></td><td>The tab is showing in the main window</td></tr><tr><td><code>…/isEditing</code></td><td><code>bool</code></td><td>The tab is in Edit Mode</td></tr><tr><td><code>…/isHolding</code></td><td><code>bool</code></td><td>The tab&#x27;s outputs are frozen on their last frame while it is edited</td></tr><tr><td><code>…/isLoading</code></td><td><code>bool</code></td><td>The page is loading</td></tr><tr><td><code>…/muted</code></td><td><code>bool</code></td><td>The tab&#x27;s mute switch is on</td></tr><tr><td><code>…/zoom</code></td><td><code>f</code></td><td>Page zoom (1.0 = 100%)</td></tr><tr><td><code>…/canvas</code></td><td><code>s</code></td><td>Canvas size, e.g. <code>1920x1080</code></td></tr><tr><td><code>…/captureFps</code></td><td><code>f</code></td><td>New frames captured per second. 0 while the tab is idle or holding; a static page can report low values, which is normal</td></tr><tr><td><code>…/outputCount</code></td><td><code>i</code></td><td>Outputs configured on this tab</td></tr><tr><td><code>…/outputsLive</code></td><td><code>i</code></td><td>Outputs running on this tab</td></tr><tr><td><code>…/error</code></td><td><code>s</code></td><td>Latest capture or page problem. Empty when there is none</td></tr></tbody></table>
+<h4 id="outputs-bb-tab-n-output-m">Outputs: <code>/bb/tab/{n}/output/{m}/…</code></h4>
+<table><thead><tr><th>Address</th><th>Type</th><th>Meaning</th></tr></thead><tbody><tr><td><code>…/name</code></td><td><code>s</code></td><td>Output name (the NDI source, Syphon server or device name)</td></tr><tr><td><code>…/kind</code></td><td><code>s</code></td><td><code>ndi</code>, <code>syphon</code>, <code>decklink</code>, <code>display</code> or <code>record</code></td></tr><tr><td><code>…/isLive</code></td><td><code>bool</code></td><td>The output is running and sending frames</td></tr><tr><td><code>…/status</code></td><td><code>s</code></td><td><code>idle</code>, <code>starting</code>, <code>live</code> or <code>error</code></td></tr><tr><td><code>…/error</code></td><td><code>s</code></td><td>Error message. Empty unless <code>status</code> is <code>error</code></td></tr><tr><td><code>…/format</code></td><td><code>s</code></td><td>The output&#x27;s video format, e.g. <code>1080p59.94</code> or <code>1080i59.94</code></td></tr><tr><td><code>…/fps</code></td><td><code>f</code></td><td>Measured frames sent per second</td></tr><tr><td><code>…/framesSent</code></td><td><code>i</code></td><td>Frames sent since this output started</td></tr><tr><td><code>…/dropped</code></td><td><code>i</code></td><td>Frames skipped because the computer fell behind</td></tr><tr><td><code>…/late</code></td><td><code>i</code></td><td>DeckLink only: frames the card displayed late</td></tr><tr><td><code>…/uptime</code></td><td><code>f</code></td><td>Seconds this output has been running</td></tr><tr><td><code>…/receivers</code></td><td><code>i</code></td><td>NDI: number of connected receivers. Syphon: 1 if any client is connected, otherwise 0. −1 = unknown</td></tr><tr><td><code>…/tally</code></td><td><code>s</code></td><td>NDI tally: <code>program</code>, <code>preview</code> or <code>none</code></td></tr><tr><td><code>…/audio</code></td><td><code>bool</code></td><td>Audio is turned on for this output</td></tr><tr><td><code>…/crop</code></td><td><code>bool</code></td><td>The output is cropped</td></tr></tbody></table>
+<h3 id="5-2-events">5.2 Events</h3>
+<p>These are sent the moment something changes, in addition to the regular snapshot.</p>
+<table><thead><tr><th>Address</th><th>Arguments</th><th>When</th></tr></thead><tbody><tr><td><code>/bb/tab/{n}/isLive</code></td><td><code>bool</code></td><td>A tab goes live or stops</td></tr><tr><td><code>/bb/event/tabLive</code></td><td><code>i:n s:name bool:isLive</code></td><td>Same moment, as one self-describing message</td></tr><tr><td><code>/bb/session/isLive</code></td><td><code>bool</code></td><td>The session goes on or off air</td></tr><tr><td><code>/bb/event/sessionLive</code></td><td><code>bool</code></td><td>Same moment</td></tr><tr><td><code>/bb/tab/{n}/isEditing</code></td><td><code>bool</code></td><td>A tab enters or leaves Edit Mode</td></tr><tr><td><code>/bb/tab/{n}/isHolding</code></td><td><code>bool</code></td><td>Sent together with <code>isEditing</code></td></tr><tr><td><code>/bb/event/outputError</code></td><td><code>i:n i:m s:outputName s:message</code></td><td>An output fails. Sent once per failure</td></tr><tr><td><code>/bb/event/tabsChanged</code></td><td><code>i:count</code></td><td>Tabs were added, closed or reordered, so positions may have shifted</td></tr><tr><td><code>/bb/event/tabCreated</code></td><td><code>i:n s:id</code></td><td>Reply to <code>/bb/tab/new</code></td></tr><tr><td><code>/bb/pong</code></td><td><code>s:version</code></td><td>Reply to <code>/bb/ping</code></td></tr><tr><td><code>/bb/error</code></td><td><code>s:message</code></td><td>A command could not be carried out</td></tr><tr><td><code>/bb/tab/{tab}/jsResult</code></td><td><code>s:result</code></td><td>Reply to <code>/js</code>, sent to the sender only</td></tr><tr><td><code>/bb/test</code></td><td><code>s i f bool</code></td><td>Sent by <em>Preferences › OSC › Send Test Message</em></td></tr></tbody></table>
+<hr>
+<h2 id="6-decoding-osc-by-hand">6. Decoding OSC by hand</h2>
+<p>An OSC message has three parts:</p>
+<ol><li><strong>Address.</strong> An ASCII string ending in a null byte (<code>00</code>), padded with more nulls to a multiple of 4 bytes.</li><li><strong>Type tags.</strong> A string that starts with <code>,</code> followed by one letter per argument, ending in a null byte and padded to a multiple of 4 bytes.</li><li><strong>Arguments</strong>, in order:</li><li><code>i</code>: 4 bytes, big-endian integer</li><li><code>f</code>: 4 bytes, big-endian float</li><li><code>s</code>: string, null-terminated and padded to 4 bytes</li><li><code>T</code> / <code>F</code>: no bytes</li></ol>
+<p>**Example 1: <code>/bb/tab/1/isLive T</code>**, 24 bytes in total:</p>
+<pre><code>2f 62 62 2f 74 61 62 2f 31 2f 69 73 4c 69 76 65   &quot;/bb/tab/1/isLive&quot;  (16 bytes)
+00 00 00 00                                       null + padding
+2c 54 00 00                                       &quot;,T&quot; + null + padding</code></pre>
+<p>**Example 2: <code>/bb/session/uptime 12.5</code>**, 28 bytes in total:</p>
+<pre><code>2f 62 62 2f 73 65 73 73 69 6f 6e 2f 75 70 74 69 6d 65 00 00   &quot;/bb/session/uptime&quot; + null + padding (20 bytes)
+2c 66 00 00                                                   &quot;,f&quot; + null + padding
+41 48 00 00                                                   12.5 as a big-endian float</code></pre>
+<p><strong>Bundles.</strong> These are only sent if you turn on <em>Pack messages into OSC bundles</em>. A bundle starts with the string <code>#bundle</code> plus a null byte (8 bytes), then an 8-byte time tag, which is always <code>00 00 00 00 00 00 00 01</code>. Then come the elements, each written as a 4-byte big-endian length followed by that many bytes of message.</p>
+<h3 id="a-complete-decoder-in-python-no-libraries-needed">A complete decoder in Python (no libraries needed)</h3>
+<pre><code>import socket, struct
+
+def read_string(data, i):
+    end = data.index(b&quot;\0&quot;, i)
+    text = data[i:end].decode(&quot;utf-8&quot;)
+    return text, (end + 4) &amp; ~3          # skip padding to the next multiple of 4
+
+def decode(data):
+    &quot;&quot;&quot;Returns a list of (address, [arguments]).&quot;&quot;&quot;
+    if data.startswith(b&quot;#bundle\0&quot;):
+        messages, i = [], 16
+        while i + 4 &lt;= len(data):
+            size = struct.unpack(&quot;&gt;i&quot;, data[i:i + 4])[0]
+            messages += decode(data[i + 4:i + 4 + size])
+            i += 4 + size
+        return messages
+    address, i = read_string(data, 0)
+    tags, i = read_string(data, i)
+    args = []
+    for tag in tags[1:]:
+        if tag == &quot;i&quot;:   args.append(struct.unpack(&quot;&gt;i&quot;, data[i:i + 4])[0]); i += 4
+        elif tag == &quot;f&quot;: args.append(struct.unpack(&quot;&gt;f&quot;, data[i:i + 4])[0]); i += 4
+        elif tag == &quot;s&quot;: text, i = read_string(data, i); args.append(text)
+        elif tag == &quot;T&quot;: args.append(True)
+        elif tag == &quot;F&quot;: args.append(False)
+    return [(address, args)]
+
+sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+sock.bind((&quot;0.0.0.0&quot;, 9301))
+while True:
+    packet, sender = sock.recvfrom(65536)
+    for address, args in decode(packet):
+        if address.endswith(&quot;/isLive&quot;) or address.startswith(&quot;/bb/event&quot;):
+            print(address, args)</code></pre>
+<h3 id="sending-a-command-with-no-libraries">Sending a command with no libraries</h3>
+<pre><code>import socket
+
+def osc(address, *args):
+    def pad(b): return b + b&quot;\0&quot; * (4 - len(b) % 4)
+    tags, payload = &quot;,&quot;, b&quot;&quot;
+    for a in args:
+        if isinstance(a, bool):  tags += &quot;T&quot; if a else &quot;F&quot;
+        elif isinstance(a, int): tags += &quot;i&quot;; payload += a.to_bytes(4, &quot;big&quot;, signed=True)
+        elif isinstance(a, float):
+            import struct; tags += &quot;f&quot;; payload += struct.pack(&quot;&gt;f&quot;, a)
+        else: tags += &quot;s&quot;; payload += pad(str(a).encode())
+    return pad(address.encode()) + pad(tags.encode()) + payload
+
+s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+s.sendto(osc(&quot;/bb/tab/1/goLive&quot;), (&quot;127.0.0.1&quot;, 9300))
+s.sendto(osc(&quot;/bb/tab/Scoreboard/zoom&quot;, 1.25), (&quot;127.0.0.1&quot;, 9300))</code></pre>
+<h3 id="with-common-tools">With common tools</h3>
+<pre><code># liblo&#x27;s oscsend / oscdump  (brew install liblo)
+oscsend localhost 9300 /bb/session/goLive
+oscsend localhost 9300 /bb/tab/2/live i 0
+oscsend localhost 9300 /bb/tab/1/url s &quot;https://example.com/scores&quot;
+oscdump 9301</code></pre>
+<pre><code># python-osc  (pip install python-osc)
+from pythonosc.udp_client import SimpleUDPClient
+SimpleUDPClient(&quot;127.0.0.1&quot;, 9300).send_message(&quot;/bb/tab/1/output/2/stop&quot;, [])</code></pre>
+<hr>
+<h2 id="7-recipes">7. Recipes</h2>
+<h3 id="bitfocus-companion-stream-deck">Bitfocus Companion / Stream Deck</h3>
+<ol><li>Add the <strong>Generic: OSC</strong> connection. Target host = the IP of the Mac running Broadcast Browser (<code>127.0.0.1</code> if Companion runs on the same Mac). Target port = <code>9300</code>.</li><li>To go live: a button with <em>Send message without arguments</em> → <code>/bb/session/goLive</code>.</li><li>To toggle one tab: <code>/bb/tab/1/toggle</code>, or <code>/bb/tab/Scoreboard/toggle</code> by name.</li><li>For feedback (a button that lights up when the tab is live), point <em>Preferences › OSC › Feedback output</em> at Companion&#x27;s OSC listening port, or have Companion send <code>/bb/feedback/subscribe i:&lt;its port&gt;</code> once at startup. Then use <code>/bb/tab/1/isLive</code> in your button feedback or variables. If Companion doesn&#x27;t react to <code>T</code>/<code>F</code> values, set <em>True/false values</em> to <strong>Integer 1/0</strong>.</li></ol>
+<h3 id="qlab">QLab</h3>
+<p>Use a <strong>Network</strong> cue with an OSC message, destination <code>&lt;Mac IP&gt;:9300</code>, e.g. <code>/bb/tab/2/goLive</code> or <code>/bb/tab/2/rule/3/enabled 1</code>.</p>
+<h3 id="watchdog">Watchdog</h3>
+<p>Check two things on the receiving end:</p>
+<ul><li>Is <code>/bb/heartbeat</code> still increasing? If it stops for more than</li></ul>
+<p>3 × your feedback interval, alarm.</p>
+<ul><li>Is <code>/bb/session/outputsError</code> above 0? If so, alarm.</li></ul>
+<p>For each tab that should be on air, also watch <code>/bb/tab/{n}/isLive</code>.</p>
+<hr>
+<h2 id="8-changes-to-this-interface">8. Changes to this interface</h2>
+<p>Addresses are stable within a major version. New messages may be added to the snapshot at any time, so receivers should ignore addresses they don&#x27;t know.</p>
+</main></body></html>
